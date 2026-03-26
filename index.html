@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Birdy Premium</title>
+
+<style>
+    body {
+        margin: 0;
+        background: linear-gradient(#6ec9ff, #ccecff);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-family: Arial, sans-serif;
+    }
+
+    canvas {
+        border: 4px solid #004;
+        background: linear-gradient(#87ceeb, #bde0ff);
+        border-radius: 10px;
+        box-shadow: 0 0 20px #0004;
+        image-rendering: pixelated;
+    }
+
+    #scoreBox {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        font-size: 26px;
+        font-weight: bold;
+        color: #003;
+        text-shadow: 0 0 4px white;
+    }
+
+    /* 🔴 NEW CODE ADDED HERE — TAP TO PLAY BUTTON */
+    #tapBtn {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #ffffffcc;
+        padding: 18px 40px;
+        border-radius: 12px;
+        font-size: 26px;
+        font-weight: bold;
+        color: #222;
+        box-shadow: 0 0 10px #0005;
+        text-align: center;
+        display: none;
+        user-select: none;
+    }
+</style>
+</head>
+<body>
+
+<div id="scoreBox">Score: <span id="sc">0</span></div>
+
+<div id="tapBtn">Tap to Play</div>
+
+<canvas id="game" width="420" height="600"></canvas>
+
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+const scEl = document.getElementById("sc");
+const tapBtn = document.getElementById("tapBtn");
+
+const W = c.width, H = c.height;
+
+const birdImg = new Image();
+birdImg.src = "bird.png";
+
+const deathAudio = new Audio("death.mp3");
+
+let bird = {
+    x: 100,
+    y: H/2,
+    vy: 0,
+    width: 40,
+    height: 32,
+    rot: 0
+};
+
+let gravity = 0.4;
+let jumpPower = -7;
+
+let pipes = [];
+let frame = 0;
+let score = 0;
+let running = false;  
+let started = false;  
+
+function reset(){
+    bird.y = H/2;
+    bird.vy = 0;
+    pipes = [];
+    frame = 0;
+    score = 0;
+    scEl.textContent = "0";
+    running = false;
+    started = false;
+    tapBtn.textContent = "Tap to Play";
+    tapBtn.style.display = "block";
+}
+
+function addPipe(){
+    const gap = 150;
+    const topHeight = 80 + Math.random() * 260;
+
+    pipes.push({
+        x: W,
+        top: topHeight,
+        gap: gap,
+        passed: false
+    });
+}
+
+function drawSpikes(x, y, count, dir){
+    ctx.fillStyle = "#146b12";
+    let size = 16;
+    for(let i = 0; i < count; i++){
+        ctx.beginPath();
+        ctx.moveTo(x + i*size, y);
+        ctx.lineTo(x + i*size + size/2, y + (dir==="down" ? size : -size));
+        ctx.lineTo(x + i*size + size, y);
+        ctx.fill();
+    }
+}
+
+function hits(pipe){
+    let bx1 = bird.x, bx2 = bird.x + bird.width;
+    let by1 = bird.y, by2 = bird.y + bird.height;
+
+    if(bx2 > pipe.x && bx1 < pipe.x + 60 && by1 < pipe.top) return true;
+    if(bx2 > pipe.x && bx1 < pipe.x + 60 && by2 > pipe.top + pipe.gap) return true;
+
+    return false;
+}
+
+function gameOver(){
+    running = false;
+    deathAudio.currentTime = 0;
+    deathAudio.play().catch(()=>{});
+
+    tapBtn.textContent = "Tap to Restart";
+    tapBtn.style.display = "block";
+}
+
+function loop(){
+    frame++;
+    ctx.clearRect(0,0,W,H);
+
+    if(frame % 95 === 0 && running) addPipe();
+
+    pipes.forEach((p, i) => {
+        if(running) p.x -= 2.5;
+
+        ctx.fillStyle = "#1fa025";
+
+        ctx.fillRect(p.x, 0, 60, p.top);
+        drawSpikes(p.x, p.top, 4, "down");
+
+        ctx.fillRect(p.x, p.top + p.gap, 60, H-(p.top+p.gap));
+        drawSpikes(p.x, p.top + p.gap, 4, "up");
+
+        if(!p.passed && p.x + 60 < bird.x){
+            score++;
+            scEl.textContent = score;
+            p.passed = true;
+        }
+
+        if(p.x < -80) pipes.splice(i,1);
+
+        if(running && hits(p)){
+            gameOver();
+        }
+    });
+
+    if(running){
+        bird.vy += gravity;
+        bird.y += bird.vy;
+    }
+
+    if(bird.y > H - bird.height || bird.y < 0){
+        if(running) gameOver();
+    }
+
+    ctx.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+
+    requestAnimationFrame(loop);
+}
+
+function startGame(){
+    if(!started){
+        started = true;
+        running = true;
+        tapBtn.style.display = "none";
+        bird.vy = jumpPower;
+    } else if(!running){
+        reset();
+    } else {
+        bird.vy = jumpPower;
+    }
+}
+
+window.addEventListener("keydown", e=>{
+    if(e.code === "Space") startGame();
+});
+c.addEventListener("click", startGame);
+tapBtn.addEventListener("click", startGame);
+
+reset();
+loop();
+</script>
+
+</body>
+</html>
